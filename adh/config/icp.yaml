@@ -1,0 +1,112 @@
+# ICP — Ideal Customer Profile
+# Modifica questo file per calibrare il targeting del Scout Agent
+
+target:
+  paese: "IT"
+  regioni_priorita:
+    - "Piemonte"
+    - "Lombardia"
+    - "Veneto"
+    - "Emilia-Romagna"
+  dimensione_azienda:
+    min_dipendenti: 5
+    max_dipendenti: 80
+  fatturato:
+    min: 500000
+    max: 20000000
+
+settori_priorita:
+  - nome: "Studi commercialisti"
+    google_place_type: "accounting"
+    peso: 10
+  - nome: "Studi legali"
+    google_place_type: "lawyer"
+    peso: 9
+  - nome: "Agenzie immobiliari"
+    google_place_type: "real_estate_agency"
+    peso: 9
+  - nome: "E-commerce moda/arredamento"
+    google_place_type: "store"
+    peso: 8
+  - nome: "Catene di ristorazione"
+    google_place_type: "restaurant"
+    peso: 7
+  - nome: "Agenzie di marketing"
+    google_place_type: "marketing_agency"
+    peso: 8
+  - nome: "Studi medici/dentistici"
+    google_place_type: "doctor"
+    peso: 7
+  - nome: "Officine meccaniche (rete)"
+    google_place_type: "car_repair"
+    peso: 6
+  - nome: "Centri estetici/SPA"
+    google_place_type: "beauty_salon"
+    peso: 6
+
+signals_di_dolore:
+  - id: "annunci_admin"
+    descrizione: "Annunci di lavoro per ruoli amministrativi ripetitivi"
+    peso: 8
+    sources: ["indeed", "infojobs", "linkedin"]
+  - id: "recensioni_lente"
+    descrizione: "Recensioni Google che lamentano tempi di risposta"
+    peso: 9
+    sources: ["google_reviews"]
+    keywords: ["attesa", "lento", "nessuno risponde", "impossibile contattare", "non rispondono"]
+  - id: "sito_vecchio"
+    descrizione: "Sito web vecchio (>5 anni) senza chatbot"
+    peso: 6
+    sources: ["website_analysis"]
+  - id: "linkedin_trascurato"
+    descrizione: "Pagine LinkedIn aziendali poco curate (ultimo post >6 mesi)"
+    peso: 5
+    sources: ["linkedin"]
+  - id: "solo_telefono"
+    descrizione: "Numero di telefono come unico contatto visibile"
+    peso: 7
+    sources: ["website_analysis", "google_business"]
+  - id: "no_autorispostaa"
+    descrizione: "Form contatti senza autorispostaa automatica"
+    peso: 6
+    sources: ["website_analysis"]
+
+esclusioni:
+  - "Aziende con team IT >5 persone (probabilmente giÃ  internalizzato)"
+  - "Multinazionali (>500 dipendenti)"
+  - "Aziende già clienti di Salesforce/HubSpot enterprise"
+  - "Aziende con sito web moderno + chatbot attivo"
+
+angoli_di_pitch:
+  - id: "customer_service"
+    nome: "Automazione customer service"
+    descrizione: "Chatbot su sito/WhatsApp per gestire richieste clienti"
+    trigger_signals: ["recensioni_lente", "solo_telefono"]
+  - id: "email_triage"
+    nome: "Triage email automatico"
+    descrizione: "Sistema AI che smista e risponde alle email comuni"
+    trigger_signals: ["annunci_admin", "no_autorispostaa"]
+  - id: "doc_generation"
+    nome: "Generazione documenti"
+    descrizione: "Assistente AI per preventivi, contratti, fatturazione"
+    trigger_signals: ["annunci_admin"]
+  - id: "lead_capture"
+    nome: "Lead capture AI"
+    descrizione: "Qualificazione automatica dei lead da landing page"
+    trigger_signals: ["sito_vecchio", "no_autorispostaa"]
+  - id: "reputation_mgmt"
+    nome: "Reputation management"
+    descrizione: "Risposta automatica personalizzata alle recensioni Google"
+    trigger_signals: ["recensioni_lente"]
+  - id: "onboarding"
+    nome: "Onboarding clienti automatizzato"
+    descrizione: "Sequenza automatica di benvenuto e raccolta informazioni"
+    trigger_signals: ["annunci_admin", "solo_telefono"]
+
+sequenza:
+  follow_up_1_giorni: 4
+  follow_up_2_giorni: 10
+  max_follow_up: 2
+  blacklist_mesi: 12
+  not_now_followup_giorni: 60
+  ooo_resend_giorni: 14

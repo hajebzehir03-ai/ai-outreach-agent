@@ -1,0 +1,96 @@
+[project]
+name = "ai-outreach-agent"
+version = "0.1.0"
+description = "Autonomous AI outreach agent for Italian SMB lead generation"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Zehir", email = "hajeb.zehir03@gmail.com" }]
+
+dependencies = [
+    # Agent framework
+    "langgraph>=0.2.0",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langsmith>=0.1.0",
+
+    # LLM
+    "anthropic>=0.40.0",
+
+    # Database
+    "sqlmodel>=0.0.21",
+    "psycopg2-binary>=2.9.0",
+    "pgvector>=0.3.0",
+    "alembic>=1.13.0",
+
+    # Web / API
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.28.0",
+    "playwright>=1.49.0",
+
+    # Email
+    "resend>=2.5.0",
+
+    # Data processing
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "rapidfuzz>=3.10.0",
+    "python-dotenv>=1.0.0",
+
+    # Dashboard
+    "streamlit>=1.40.0",
+    "plotly>=5.24.0",
+
+    # Scheduling
+    "apscheduler>=3.10.0",
+
+    # Search
+    "tavily-python>=0.5.0",
+
+    # Utilities
+    "rich>=13.9.0",
+    "typer>=0.15.0",
+    "pyyaml>=6.0.0",
+    "python-slugify>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "black>=24.10.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+]
+
+[project.scripts]
+adh = "adh.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.black]
+target-version = ["py311"]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=adh --cov-report=term-missing --cov-fail-under=70"
