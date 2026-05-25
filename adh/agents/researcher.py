@@ -1,6 +1,5 @@
 """Researcher Agent — enrichment con prompt caricato da file."""
 
-import asyncio
 import json
 import re
 from datetime import UTC, datetime
@@ -104,18 +103,14 @@ Produce the full JSON output as specified."""
     return cast(dict[Any, Any], json.loads(raw))
 
 
-def researcher_node(state: AgentState) -> AgentState:
+async def researcher_node(state: AgentState) -> AgentState:
     """Nodo LangGraph: arricchisce la company con dati da web + LLM analysis."""
     company = state.company
     if not company:
         return state.model_copy(update={"status": "error", "error": "Company mancante"})
 
-    website_text, website_url = asyncio.get_event_loop().run_until_complete(
-        _fetch_text(company.website or "")
-    )
-    rating, review_count, pain_snippets = asyncio.get_event_loop().run_until_complete(
-        _google_reviews(company.google_place_id or "")
-    )
+    website_text, website_url = await _fetch_text(company.website or "")
+    rating, review_count, pain_snippets = await _google_reviews(company.google_place_id or "")
 
     pain_texts = [s.text for s in pain_snippets]
 

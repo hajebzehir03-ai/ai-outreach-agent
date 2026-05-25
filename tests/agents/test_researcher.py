@@ -323,31 +323,28 @@ class TestLlmAnalyze:
 # ---------------------------------------------------------------------------
 
 class TestResearcherNode:
-    def test_no_company_returns_error(self):
+    @pytest.mark.asyncio
+    async def test_no_company_returns_error(self):
         """State senza company → errore immediato."""
         state = AgentState(company=None)
-        result = researcher_node(state)
+        result = await researcher_node(state)
         assert result.status == "error"
         assert result.error is not None
 
-    def test_successful_enrichment(self):
+    @pytest.mark.asyncio
+    async def test_successful_enrichment(self):
         """Flow completo → intel popolato correttamente."""
         state = _make_state()
         payload = _make_llm_payload()
         mock_llm_response = _make_llm_response(payload)
 
-        with patch("adh.agents.researcher.asyncio.get_event_loop") as mock_loop, \
+        with patch("adh.agents.researcher._fetch_text", new=AsyncMock(
+                return_value=("Testo sito web Studio Bertoli", "https://studiobertoli.it"))), \
+             patch("adh.agents.researcher._google_reviews", new=AsyncMock(
+                return_value=(3.5, 20, []))), \
              patch("adh.agents.researcher.client") as mock_client:
-            # Mock event loop per le chiamate async
-            mock_loop_instance = MagicMock()
-            mock_loop.return_value = mock_loop_instance
-            mock_loop_instance.run_until_complete.side_effect = [
-                ("Testo sito web Studio Bertoli", "https://studiobertoli.it"),
-                (3.5, 20, []),  # rating, count, snippets
-            ]
             mock_client.messages.create.return_value = mock_llm_response
-
-            result = researcher_node(state)
+            result = await researcher_node(state)
 
         assert result.status != "error"
         assert result.intel is not None
@@ -356,42 +353,36 @@ class TestResearcherNode:
         assert len(result.intel.pain_signals) == 1
         assert result.intel.pain_signals[0].signal == "Annuncio Indeed per addetto email"
 
-    def test_llm_error_returns_error_state(self):
+    @pytest.mark.asyncio
+    async def test_llm_error_returns_error_state(self):
         """Se LLM fallisce → stato error con messaggio."""
         state = _make_state()
 
-        with patch("adh.agents.researcher.asyncio.get_event_loop") as mock_loop, \
+        with patch("adh.agents.researcher._fetch_text", new=AsyncMock(
+                return_value=("testo", "https://studiobertoli.it"))), \
+             patch("adh.agents.researcher._google_reviews", new=AsyncMock(
+                return_value=(0.0, 0, []))), \
              patch("adh.agents.researcher.client") as mock_client:
-            mock_loop_instance = MagicMock()
-            mock_loop.return_value = mock_loop_instance
-            mock_loop_instance.run_until_complete.side_effect = [
-                ("testo", "https://studiobertoli.it"),
-                (0.0, 0, []),
-            ]
             mock_client.messages.create.side_effect = Exception("Anthropic API down")
-
-            result = researcher_node(state)
+            result = await researcher_node(state)
 
         assert result.status == "error"
         assert "LLM" in (result.error or "") or "researcher" in (result.error or "").lower()
 
-    def test_enriches_decision_maker(self):
+    @pytest.mark.asyncio
+    async def test_enriches_decision_maker(self):
         """decision_makers nel payload LLM → parsati correttamente."""
         state = _make_state()
         payload = _make_llm_payload()
         mock_llm_response = _make_llm_response(payload)
 
-        with patch("adh.agents.researcher.asyncio.get_event_loop") as mock_loop, \
+        with patch("adh.agents.researcher._fetch_text", new=AsyncMock(
+                return_value=("testo", "https://studiobertoli.it"))), \
+             patch("adh.agents.researcher._google_reviews", new=AsyncMock(
+                return_value=(0.0, 0, []))), \
              patch("adh.agents.researcher.client") as mock_client:
-            mock_loop_instance = MagicMock()
-            mock_loop.return_value = mock_loop_instance
-            mock_loop_instance.run_until_complete.side_effect = [
-                ("testo", "https://studiobertoli.it"),
-                (0.0, 0, []),
-            ]
             mock_client.messages.create.return_value = mock_llm_response
-
-            result = researcher_node(state)
+            result = await researcher_node(state)
 
         assert len(result.intel.decision_makers) == 1
         dm = result.intel.decision_makers[0]
@@ -399,23 +390,20 @@ class TestResearcherNode:
         assert dm.role == "Socio fondatore"
         assert dm.email_guessed == "m.bertoli@studiobertoli.it"
 
-    def test_no_website_still_proceeds(self):
+    @pytest.mark.asyncio
+    async def test_no_website_still_proceeds(self):
         """Company senza website → researcher procede (website_text vuoto)."""
         state = _make_state(website=None, google_place_id=None)
         payload = _make_llm_payload(pain_signals=[], decision_makers=[])
         mock_llm_response = _make_llm_response(payload)
 
-        with patch("adh.agents.researcher.asyncio.get_event_loop") as mock_loop, \
+        with patch("adh.agents.researcher._fetch_text", new=AsyncMock(
+                return_value=("", ""))), \
+             patch("adh.agents.researcher._google_reviews", new=AsyncMock(
+                return_value=(0.0, 0, []))), \
              patch("adh.agents.researcher.client") as mock_client:
-            mock_loop_instance = MagicMock()
-            mock_loop.return_value = mock_loop_instance
-            mock_loop_instance.run_until_complete.side_effect = [
-                ("", ""),
-                (0.0, 0, []),
-            ]
             mock_client.messages.create.return_value = mock_llm_response
-
-            result = researcher_node(state)
+            result = await researcher_node(state)
 
         assert result.status != "error"
         assert result.intel is not None
