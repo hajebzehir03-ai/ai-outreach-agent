@@ -221,38 +221,31 @@ class TestUnsubscribe:
 # ---------------------------------------------------------------------------
 
 class TestInterested:
-   def test_interested_notifies_telegram(
-    self, client, company_with_message, in_memory_db
-):
-    """
-    Lead caldo → asyncio.create_task chiamato con notify_telegram.
-    Patchiamo create_task perché notify_telegram viene schedulata
-    in background e il TestClient sincrono non aspetta che finisca.
-    """
-    company, message = company_with_message
+    def test_interested_notifies_telegram(
+        self, client, company_with_message, in_memory_db
+    ):
+        """Lead caldo → notify_telegram viene chiamata (awaited) con il messaggio."""
+        company, message = company_with_message
 
-    with patch("adh.api.webhook.classify_reply") as mock_classify, \
-         patch("adh.api.webhook.asyncio.create_task") as mock_create_task, \
-         patch("adh.api.webhook.engine", in_memory_db):
-        mock_classify.return_value = MagicMock(
-            category="interested",
-            confidence=0.95,
-            draft_response=None,
-            urgency="high",
-        )
+        with patch("adh.api.webhook.classify_reply") as mock_classify, \
+             patch("adh.api.webhook.notify_telegram", new_callable=AsyncMock) as mock_notify, \
+             patch("adh.api.webhook.engine", in_memory_db):
+            mock_classify.return_value = MagicMock(
+                category="interested",
+                confidence=0.95,
+                draft_response=None,
+                urgency="high",
+            )
 
-        payload = _make_webhook_payload(
-            resend_message_id=message.resend_message_id,
-            reply_body="Sì, mi interessa. Quando possiamo sentirci?",
-        )
-        client.post("/webhook/resend", json=payload)
+            payload = _make_webhook_payload(
+                resend_message_id=message.resend_message_id,
+                reply_body="Sì, mi interessa. Quando possiamo sentirci?",
+            )
+            client.post("/webhook/resend", json=payload)
 
-    # create_task deve essere stato chiamato (con la coroutine notify_telegram)
-    mock_create_task.assert_called_once()
-    # Verifica che la coroutine passata sia quella di notify_telegram
-    task_arg = mock_create_task.call_args[0][0]
-    # È una coroutine — verifica che il nome sia quello giusto
-    assert "notify_telegram" in str(type(task_arg)) or hasattr(task_arg, "cr_code")
+        mock_notify.assert_called_once()
+        call_arg = mock_notify.call_args[0][0]
+        assert "lead" in call_arg.lower() or "Studio Bertoli" in call_arg
 
     def test_interested_updates_company_status(
         self, client, company_with_message, in_memory_db

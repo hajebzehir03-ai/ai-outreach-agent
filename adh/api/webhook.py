@@ -1,6 +1,5 @@
 """FastAPI webhook endpoint per gestire le reply di Resend."""
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI, Request
@@ -92,7 +91,7 @@ async def _handle_reply(session: Session, message: OutreachMessage, reply_body: 
             f"Risposta: {reply_body[:300]}\n\n"
             f"→ Agisci manualmente sul CRM"
         )
-        asyncio.create_task(notify_telegram(notify_msg))
+        await notify_telegram(notify_msg)
 
     elif intent == ReplyIntent.question:
         # Genera bozza risposta per approval umano
