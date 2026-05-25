@@ -71,3 +71,8 @@ logs/
 # Playwright
 playwright-report/
 test-results/
+
+# Output scaffolding (generati da sessioni di debug/audit)
+*_output.txt
+repo_snapshot.txt
+write_test.py
