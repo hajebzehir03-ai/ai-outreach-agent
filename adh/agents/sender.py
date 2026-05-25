@@ -4,7 +4,6 @@ import random
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
-from mypy.state import state
 import resend
 from sqlmodel import Session
 
