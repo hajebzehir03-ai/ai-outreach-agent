@@ -51,7 +51,7 @@ def sender_node(state: AgentState) -> AgentState:
     """Nodo LangGraph: invia l'email via Resend (solo se approval_status == 'approved')."""
     if settings.kill_switch:
         return state.model_copy(
-            update={"status": "stopped", "error": "Kill switch attivo — invio bloccato"}
+            update={"status": "blocked", "error": "Kill switch attivo — invio bloccato"}
         )
 
     if state.approval_status != "approved":
