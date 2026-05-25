@@ -1,9 +1,9 @@
 """ADH CLI — comandi per operare il sistema da terminale."""
 
 import typer
+from rich import print as rprint
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
 
 app = typer.Typer(
     name="adh",
@@ -16,11 +16,10 @@ console = Console()
 @app.command()
 def stop_all(reason: str = typer.Option(..., "--reason", "-r", help="Motivo del blocco")):
     """Kill switch: blocca immediatamente tutti gli invii pianificati."""
-    from adh.config.settings import settings
     import os
 
     # Scrivi il flag nel .env runtime
-    console.print(f"[red]⚠ KILL SWITCH ATTIVATO[/red]")
+    console.print("[red]⚠ KILL SWITCH ATTIVATO[/red]")
     console.print(f"Motivo: {reason}")
     console.print("Tutti gli invii pianificati sono bloccati.")
     console.print("Per riattivare: imposta KILL_SWITCH=false nel .env e riavvia.")
@@ -30,10 +29,10 @@ def stop_all(reason: str = typer.Option(..., "--reason", "-r", help="Motivo del 
 @app.command()
 def status():
     """Mostra lo stato del sistema e le statistiche recenti."""
-    from sqlmodel import Session, select, func
-    from adh.models.database import engine
+    from sqlmodel import Session, func, select
+
     from adh.models.company import Company, CompanyStatus
-    from adh.models.message import OutreachMessage, MessageStatus
+    from adh.models.database import engine
 
     with Session(engine) as session:
         total = session.exec(select(func.count(Company.id))).one()
@@ -67,12 +66,12 @@ def run_scout(
 ):
     """Esegue il Scout Agent per un settore e regione specifici."""
     import asyncio
+
     from adh.agents.scout import scout_single_sector
 
     console.print(f"[cyan]Avvio Scout Agent: {sector} in {region}[/cyan]")
 
-    sector_config = {"nome": sector, "google_place_type": "establishment", "peso": 5}
-    results = asyncio.run(scout_single_sector(sector_config, region))
+    results = asyncio.run(scout_single_sector(sector, region))
 
     results = results[:limit]
     console.print(f"[green]Trovate {len(results)} aziende[/green]")
@@ -84,13 +83,16 @@ def run_scout(
 @app.command()
 def gdpr_purge(days_old: int = typer.Option(365, "--days", help="Rimuovi dati più vecchi di N giorni")):
     """GDPR: cancella i dati di aziende non interessate dopo N giorni."""
-    from datetime import timedelta
+    from datetime import UTC, timedelta
     from datetime import datetime as dt
-    from sqlmodel import Session, select
-    from adh.models.database import engine
-    from adh.models.company import Company, CompanyStatus
 
-    cutoff = dt.utcnow() - timedelta(days=days_old)
+    from sqlmodel import Session, select
+
+    from adh.models.company import Company, CompanyStatus
+    from adh.models.database import engine
+
+
+    cutoff = dt.now(UTC) - timedelta(days=days_old)
 
     with Session(engine) as session:
         to_purge = session.exec(

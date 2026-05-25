@@ -2,10 +2,15 @@
 
 import json
 import re
-from anthropic import Anthropic
 
+from anthropic import Anthropic
+from sqlmodel import Session
+
+from adh.agents._utils import extract_text
 from adh.agents.state import AgentState, MessageData, SelfCheck, load_prompt
 from adh.config.settings import settings
+from adh.models.database import engine
+from adh.models.message import MessageStatus, OutreachMessage
 
 client = Anthropic(api_key=settings.anthropic_api_key)
 SYSTEM_PROMPT = load_prompt("writer")
@@ -26,12 +31,27 @@ def _python_validate(subject: str, body: str) -> list[str]:
     violations = []
     if len(subject) > MAX_SUBJECT_CHARS:
         violations.append(f"subject_too_long:{len(subject)}")
+
+    # Word boundary match: "ai" non deve matchare "email" o "aiuto"
+    subject_lower = subject.lower()
     for w in BANNED_IN_SUBJECT:
-        if w in subject.lower():
+        # Emoji e simboli non sono "parole" — match diretto
+        if not w.isalnum():
+            if w in subject_lower:
+                violations.append(f"banned_in_subject:{w}")
+        # Parole vere: usa word boundary
+        elif re.search(rf"\b{re.escape(w)}\b", subject_lower):
             violations.append(f"banned_in_subject:{w}")
+
+    body_lower = body.lower()
     for w in BANNED_IN_BODY:
-        if w in body.lower():
-            violations.append(f"banned_in_body:{w}")
+        if not w.isalnum() or " " in w:
+            if w in body_lower:
+                violations.append(f"banned_in_body:{w}")
+        else:
+            if re.search(rf"\b{re.escape(w)}\b", body_lower):
+                violations.append(f"banned_in_body:{w}")
+
     if len(body.split()) > MAX_BODY_WORDS:
         violations.append(f"body_too_long:{len(body.split())}")
     return violations
@@ -106,7 +126,7 @@ def writer_node(state: AgentState) -> AgentState:
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
         )
-        raw = response.content[0].text.strip()
+        raw = extract_text(response)
         raw = re.sub(r"^```json\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
         data = json.loads(raw)
@@ -139,6 +159,31 @@ def writer_node(state: AgentState) -> AgentState:
             }
         )
 
+    # Crea il record DB in stato pending_approval, ottieni l'ID per il tracking
+    # Senza ID DB, il sender non può scrivere il resend_message_id e il webhook
+    # non saprà mai a quale messaggio si riferiscono aperture/click/risposte.
+    db_message_id = None
+    if state.company_id:
+        with Session(engine) as session:
+            db_msg = OutreachMessage(
+                company_id=state.company_id,
+                subject=subject,
+                body=body,
+                pitch_angle=state.qualification.selected_angle if state.qualification else "",
+                pain_signal_used=(
+                    state.qualification.evidence_for_writer[0]
+                    if state.qualification and state.qualification.evidence_for_writer
+                    else ""
+                ),
+                sequence_step=state.sequence_step,
+                status=MessageStatus.pending_approval,
+                writer_model=settings.llm_reasoning_model,
+            )
+            session.add(db_msg)
+            session.commit()
+            session.refresh(db_msg)
+            db_message_id = db_msg.id
+
     message = MessageData(
         subject=subject,
         body=body,
@@ -152,6 +197,7 @@ def writer_node(state: AgentState) -> AgentState:
         ),
         pitch_angle=state.qualification.selected_angle if state.qualification else "",
         sequence_step=state.sequence_step,
+        db_message_id=db_message_id,
     )
 
     return state.model_copy(

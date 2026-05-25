@@ -1,8 +1,9 @@
 """Streamlit Dashboard — pipeline overview, approval queue, replies inbox, CRM."""
 
-import streamlit as st
 from datetime import datetime
-from sqlmodel import Session, select, func
+
+import streamlit as st
+from sqlmodel import Session, func, select
 
 st.set_page_config(
     page_title="ADH — AI Outreach Dashboard",
@@ -17,9 +18,9 @@ def get_session():
 
 
 def page_overview():
-    from adh.models.company import Company, CompanyStatus
-    from adh.models.message import OutreachMessage, MessageStatus
     import plotly.graph_objects as go
+
+    from adh.models.company import Company, CompanyStatus
 
     st.title("Pipeline Overview")
 
@@ -44,7 +45,7 @@ def page_overview():
 
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     cols = [col1, col2, col3, col4, col5, col6]
-    for i, (label, count) in enumerate(zip(labels, counts)):
+    for i, (label, count) in enumerate(zip(labels, counts, strict=True)):
         cols[i].metric(label, count)
 
     fig = go.Figure(go.Funnel(
@@ -58,9 +59,9 @@ def page_overview():
 
 
 def page_approval_queue():
-    from adh.models.message import OutreachMessage, MessageStatus
+
     from adh.models.company import Company
-    from sqlmodel import Session
+    from adh.models.message import MessageStatus, OutreachMessage
 
     st.title("Approval Queue")
     st.caption("Revisiona e approva i messaggi prima dell'invio.")
@@ -105,7 +106,7 @@ def page_approval_queue():
             col_approve, col_reject = st.columns(2)
 
             with col_approve:
-                if st.button(f"✅ Approva", key=f"approve_{msg.id}", type="primary"):
+                if st.button("✅ Approva", key=f"approve_{msg.id}", type="primary"):
                     with get_session() as session2:
                         message = session2.get(OutreachMessage, msg.id)
                         if message:
@@ -125,7 +126,7 @@ def page_approval_queue():
                     key=f"feedback_{msg.id}",
                     placeholder="Es: troppo generico, non menziona la recensione...",
                 )
-                if st.button(f"❌ Rifiuta", key=f"reject_{msg.id}"):
+                if st.button("❌ Rifiuta", key=f"reject_{msg.id}"):
                     with get_session() as session2:
                         message = session2.get(OutreachMessage, msg.id)
                         if message:
@@ -138,8 +139,8 @@ def page_approval_queue():
 
 
 def page_replies():
-    from adh.models.message import OutreachMessage, MessageStatus, ReplyIntent
     from adh.models.company import Company
+    from adh.models.message import MessageStatus, OutreachMessage, ReplyIntent
 
     st.title("Replies Inbox")
 
@@ -168,7 +169,7 @@ def page_replies():
         icon = intent_colors.get(msg.reply_intent, "📩")
         with st.expander(f"{icon} {company.name} — {msg.reply_intent}"):
             st.write(f"**Ricevuta:** {msg.reply_received_at}")
-            st.write(f"**Risposta:**")
+            st.write("**Risposta:**")
             st.text(msg.reply_body or "")
 
             if msg.reply_draft:
@@ -223,7 +224,6 @@ def page_settings():
     st.subheader("ICP Configuration")
     st.caption("Modifica adh/config/icp.yaml per cambiare settori, regioni e soglie.")
 
-    import yaml
     from pathlib import Path
 
     icp_path = Path(__file__).parent.parent / "config" / "icp.yaml"

@@ -2,10 +2,11 @@
 
 import json
 import re
-import asyncio
+
 import httpx
 from anthropic import Anthropic
 
+from adh.agents._utils import extract_text
 from adh.agents.state import ReplyData, ReplyExtracted, load_prompt
 from adh.config.settings import settings
 
@@ -36,7 +37,7 @@ Classify and produce the full JSON output as specified."""
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
         )
-        raw = response.content[0].text.strip()
+        raw = extract_text(response)
         raw = re.sub(r"^```json\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
         data = json.loads(raw)

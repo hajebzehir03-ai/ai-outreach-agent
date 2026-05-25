@@ -1,15 +1,14 @@
 """Orchestrator — LangGraph state machine con routing completo da orchestrator.md."""
 
-from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
 
-from adh.agents.state import AgentState
-from adh.agents.scout import scout_node
-from adh.agents.researcher import researcher_node
 from adh.agents.qualifier import qualifier_node
-from adh.agents.writer import writer_node
+from adh.agents.researcher import researcher_node
+from adh.agents.scout import scout_node
 from adh.agents.sender import sender_node
-
+from adh.agents.state import AgentState
+from adh.agents.writer import writer_node
 
 # ---------------------------------------------------------------------------
 # Nodi terminali / utility

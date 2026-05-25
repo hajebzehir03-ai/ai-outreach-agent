@@ -1,15 +1,24 @@
 """Researcher Agent — enrichment con prompt caricato da file."""
 
+import asyncio
 import json
 import re
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any, cast
+
 import httpx
 from anthropic import Anthropic
 
+from adh.agents._utils import extract_text
 from adh.agents.state import (
-    AgentState, IntelData, PainSignal, DecisionMaker,
-    Buyability, TechStack, ReviewSnippet, load_prompt,
+    AgentState,
+    Buyability,
+    DecisionMaker,
+    IntelData,
+    PainSignal,
+    ReviewSnippet,
+    TechStack,
+    load_prompt,
 )
 from adh.config.settings import settings
 
@@ -78,7 +87,7 @@ Website text (excerpt):
 Negative reviews found:
 {chr(10).join(f'- {r}' for r in pain_reviews) if pain_reviews else 'None found.'}
 
-Research date: {datetime.now(timezone.utc).isoformat()}
+Research date: {datetime.now(UTC).isoformat()}
 
 Produce the full JSON output as specified."""
 
@@ -88,11 +97,11 @@ Produce the full JSON output as specified."""
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_msg}],
     )
-    raw = response.content[0].text.strip()
+    raw = extract_text(response)
     # Strip markdown code fences if present
     raw = re.sub(r"^```json\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
-    return json.loads(raw)
+    return cast(dict[Any, Any], json.loads(raw))
 
 
 def researcher_node(state: AgentState) -> AgentState:
@@ -145,7 +154,7 @@ def researcher_node(state: AgentState) -> AgentState:
     intel = IntelData(
         company_id=str(state.company_id or ""),
         company_name=company.name,
-        research_date=datetime.now(timezone.utc).isoformat(),
+        research_date=datetime.now(UTC).isoformat(),
         pain_signals=pain_signals,
         decision_makers=decision_makers,
         buyability=Buyability(

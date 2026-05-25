@@ -1,13 +1,19 @@
 """Test Writer Agent: validazione anti-spam, self_check, parsing."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from adh.agents.writer import _python_validate, BANNED_IN_SUBJECT, BANNED_IN_BODY
-from adh.agents.state import (
-    AgentState, CompanyData, IntelData, QualificationData,
-    ScoreBreakdown, SelfCheck, Buyability, TechStack,
-)
+from unittest.mock import MagicMock, patch
 
+from anthropic.types import TextBlock
+
+from adh.agents.state import (
+    AgentState,
+    Buyability,
+    CompanyData,
+    IntelData,
+    QualificationData,
+    ScoreBreakdown,
+    TechStack,
+)
+from adh.agents.writer import _python_validate
 
 # ---------------------------------------------------------------------------
 # Test validazione Python (safety net indipendente dall'LLM)
@@ -80,7 +86,7 @@ def _make_mock_response(subject: str, body: str, score: int = 9, violations: lis
         },
     })
     mock = MagicMock()
-    mock.content = [MagicMock(text=payload)]
+    mock.content = [TextBlock(type="text", text=payload)]
     return mock
 
 

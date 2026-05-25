@@ -1,8 +1,10 @@
 """Test Reply Handler: 9 categorie, GDPR unsubscribe, urgency, draft_response."""
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+from anthropic.types import TextBlock
+
 from adh.agents.reply_handler import classify_reply
 
 
@@ -23,7 +25,7 @@ def _make_reply_response(**overrides) -> MagicMock:
     }
     payload.update(overrides)
     mock = MagicMock()
-    mock.content = [MagicMock(text=json.dumps(payload))]
+    mock.content = [TextBlock(type="text", text=json.dumps(payload))]
     return mock
 
 
@@ -157,8 +159,8 @@ class TestClassifyReply:
     @patch("adh.agents.reply_handler.client")
     def test_fallback_on_parse_error(self, mock_client):
         mock_client.messages.create.return_value = MagicMock(
-            content=[MagicMock(text="risposta non JSON valida {{{")]
-        )
+        content=[TextBlock(type="text", text="risposta non JSON valida {{{")]
+               )
         result = classify_reply("qualcosa di strano")
 
         assert result.category == "other"

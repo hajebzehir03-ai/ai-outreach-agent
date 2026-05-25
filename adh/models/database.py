@@ -1,4 +1,5 @@
-from sqlmodel import create_engine, Session, SQLModel
+from sqlmodel import Session, SQLModel, create_engine
+
 from adh.config.settings import settings
 
 engine = create_engine(
