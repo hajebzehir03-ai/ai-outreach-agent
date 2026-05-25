@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Optional
 
@@ -51,7 +51,7 @@ class OutreachMessage(SQLModel, table=True):
     resend_message_id: str | None = None
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     approved_at: datetime | None = None
     sent_at: datetime | None = None
     opened_at: datetime | None = None
@@ -84,6 +84,6 @@ class ProcessingLog(SQLModel, table=True):
     action: str
     legal_basis: str = Field(default="legittimo_interesse_gdpr_6_1_f")
     data_processed: list = Field(default=[], sa_column=Column(JSON))
-    performed_at: datetime = Field(default_factory=datetime.utcnow)
+    performed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     retention_until: datetime | None = None
     notes: str | None = None

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import JSON, Text
@@ -42,6 +42,6 @@ class CompanyIntel(SQLModel, table=True):
     # Raw text for embedding (concatenation of all intel)
     raw_intel_text: str | None = Field(default=None, sa_column=Column(Text))
 
-    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     company: Optional["Company"] = Relationship(back_populates="intel")

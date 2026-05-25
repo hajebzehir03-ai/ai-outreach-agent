@@ -1,6 +1,6 @@
 """Streamlit Dashboard — pipeline overview, approval queue, replies inbox, CRM."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import streamlit as st
 from sqlmodel import Session, func, select
@@ -111,7 +111,7 @@ def page_approval_queue():
                         message = session2.get(OutreachMessage, msg.id)
                         if message:
                             message.status = MessageStatus.approved
-                            message.approved_at = datetime.utcnow()
+                            message.approved_at = datetime.now(UTC)
                             # Update edited content
                             message.subject = st.session_state.get(f"subject_{msg.id}", msg.subject)
                             message.body = st.session_state.get(f"body_{msg.id}", msg.body)

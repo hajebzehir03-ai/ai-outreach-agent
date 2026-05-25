@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -47,8 +47,8 @@ class Company(SQLModel, table=True):
     qualification_reasoning: str | None = Field(default=None, sa_column=Column(Text))
     pain_signals: list = Field(default=[], sa_column=Column(JSON))
     pitch_angle: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     blacklisted_until: datetime | None = Field(default=None)
 
     intel: list["CompanyIntel"] = Relationship(back_populates="company")
