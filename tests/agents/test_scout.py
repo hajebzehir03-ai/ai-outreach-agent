@@ -3,12 +3,12 @@ Test Scout Agent: _in_region, scout_node, scout_single_sector (HTTP mockato).
 Nessuna chiamata reale a Google Places.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from adh.agents.scout import _in_region, _place_details, scout_node, scout_single_sector
 from adh.agents.state import AgentState, CompanyData
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -361,6 +361,6 @@ class TestScoutSingleSector:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client.get = AsyncMock(side_effect=Exception("Connection timeout"))
 
-        with patch("adh.agents.scout.httpx.AsyncClient", return_value=mock_client):
-            with pytest.raises(Exception, match="Connection timeout"):
-                await scout_single_sector("Studi commercialisti", "Piemonte")
+        with patch("adh.agents.scout.httpx.AsyncClient", return_value=mock_client), \
+             pytest.raises(Exception, match="Connection timeout"):
+            await scout_single_sector("Studi commercialisti", "Piemonte")

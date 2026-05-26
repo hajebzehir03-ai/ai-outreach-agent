@@ -4,7 +4,6 @@ Nessuna chiamata reale a HTTP o Anthropic API.
 """
 
 import json
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,7 +16,6 @@ from adh.agents.researcher import (
     researcher_node,
 )
 from adh.agents.state import AgentState, CompanyData
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -301,7 +299,7 @@ class TestLlmAnalyze:
 
         with patch("adh.agents.researcher.client") as mock_client:
             mock_client.messages.create.return_value = mock_response
-            with pytest.raises(Exception):
+            with pytest.raises(json.JSONDecodeError):
                 _llm_analyze("test", "test", "", "", [])
 
     def test_passes_company_name_in_prompt(self):

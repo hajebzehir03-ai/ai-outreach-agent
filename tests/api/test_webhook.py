@@ -3,8 +3,7 @@ Test Webhook: classificazione reply, GDPR unsubscribe, notifiche Telegram,
 edge case (messaggio non trovato, event type sconosciuto).
 """
 
-import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,7 +15,6 @@ from adh.models import Company, MessageStatus, OutreachMessage, ProcessingLog
 from adh.models.company import CompanyStatus
 from adh.models.message import ReplyIntent
 
-
 # ---------------------------------------------------------------------------
 # Fixture: TestClient FastAPI + DB in-memory
 # ---------------------------------------------------------------------------
@@ -25,11 +23,11 @@ from adh.models.message import ReplyIntent
 def client(in_memory_db):
     """
     TestClient FastAPI con DB in-memory iniettato.
-    
+
     Patcha engine in TUTTI i posti dove viene usato dal webhook:
     - adh.api.webhook.engine (usato inline nel handler)
     - adh.models.database.engine (il modulo sorgente)
-    
+
     Entrambi devono puntare allo stesso in_memory_db altrimenti
     Session() cattura il riferimento originale (PostgreSQL).
     """
@@ -81,7 +79,6 @@ def company_with_message(in_memory_db):
         # Ritorna copie "detached" con tutti gli attributi già caricati
         company_id = company.id
         message_id = message.id
-        message_resend_id = message.resend_message_id
 
     # Rileggi fuori dalla sessione per avere oggetti puliti
     with Session(in_memory_db) as session:
