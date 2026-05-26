@@ -76,3 +76,4 @@ test-results/
 *_output.txt
 repo_snapshot.txt
 write_test.py
+TASK.md
