@@ -1,170 +1,70 @@
 # ADH — AI-Driven Hunter
 
-Agente AI autonomo per outreach B2B verso PMI italiane. Trova aziende con processi manuali ripetitivi, le qualifica, personalizza email in italiano e gestisce le risposte — con approvazione umana obbligatoria prima di ogni invio.
+**Autonomous multi-agent pipeline for B2B outreach to Italian SMBs — with a mandatory human approval gate before any email is sent.**
 
-**Stack**: Python 3.11 · LangGraph · Claude Sonnet/Haiku · PostgreSQL + pgvector · Resend · Streamlit
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python)](https://python.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph-orchestration-purple)](https://langchain-ai.github.io/langgraph/)
+[![Claude](https://img.shields.io/badge/Claude-Sonnet%20%2B%20Haiku-orange)](https://anthropic.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
----
+ADH finds local businesses with repetitive manual processes, researches and scores them, writes a personalized outreach email in Italian, and handles replies — orchestrated as a LangGraph state machine where **no message leaves the system without explicit human approval**.
 
-## Architettura
+## Agent pipeline
 
 ```mermaid
 graph TD
-    A[Scout Agent\nGoogle Places API] --> B[Researcher Agent\nWeb + Reviews + LLM]
-    B --> C[Qualifier Agent\nScore 0-100 + Angolo]
-    C -->|score < 60 o do_not_contact| D[Archive]
-    C -->|score ≥ 60| E[Writer Agent\nEmail personalizzata ITA]
-    E -->|self_check fallisce| E
-    E -->|max 2 retry| D
-    E --> F{Approval Gate\nStreamlit Dashboard}
-    F -->|Approvato / Editato| G[Sender Agent\nResend + timing]
-    F -->|Rifiutato| D
-    G --> H[Reply Handler\n9 categorie + urgency]
-    H -->|interested| I[🔥 Notifica Telegram\nManual action]
-    H -->|interested_later| J[⏳ Follow-up schedulato]
-    H -->|unsubscribe| K[⛔ Blacklist permanente]
-    H -->|out_of_office| L[✈️ Re-send +1 giorno ritorno]
-    H -->|question| M[❓ Bozza risposta\nper approval]
+    A[Scout Agent<br/>Google Places API] --> B[Researcher Agent<br/>Web + reviews + LLM]
+    B --> C[Qualifier Agent<br/>score 0-100 + outreach angle]
+    C -->|score < 60 or do_not_contact| D[Archive]
+    C -->|score >= 60| E[Writer Agent<br/>personalized email, ITA]
+    E -->|self-check fails, max 2 retries| D
+    E --> F{Approval Gate<br/>Streamlit dashboard}
+    F -->|approved / edited| G[Sender Agent<br/>Resend + send-time logic]
+    F -->|rejected| D
+    G --> H[Reply Handler<br/>9 reply categories + urgency]
+    H -->|interested| I[Telegram notification]
+    H -->|interested_later| J[Scheduled follow-up]
+    H -->|unsubscribe| K[Permanent blacklist]
+    H -->|out_of_office| L[Re-send after return]
+    H -->|question| M[Draft reply for approval]
 ```
 
----
+Seven specialized agents plus an orchestrator (`adh/agents/`): **Scout → Researcher → Qualifier → Writer → Approval Gate → Sender → Reply Handler**, each with its own tools, prompts, and typed state.
 
-## Quickstart
+## Key engineering decisions
 
-### 1. Prerequisiti
-- Python 3.11+
-- PostgreSQL 16 con estensione pgvector
-- [uv](https://docs.astral.sh/uv/) per dependency management
+- **Human-in-the-loop guardrail** — the approval gate is a hard stop in the graph, not a convention: the Sender agent is unreachable without an approve/edit action from the dashboard.
+- **Typed graph state** — a single state model flows through the LangGraph nodes, making every transition explicit and testable.
+- **Writer self-check loop** — generated emails are validated against quality rules (banned phrases, personalization checks); failures trigger a rewrite, max 2 retries, then archive.
+- **Reply classification** — incoming replies are classified into 9 categories with urgency scoring, each mapped to a distinct automated or human action.
+- **pgvector for retrieval** — company research is embedded in PostgreSQL/pgvector for deduplication and semantic lookup.
+- **Cost-tiered models** — Claude Haiku for high-volume classification, Sonnet for writing and reasoning.
+- **Compliance by design** — GDPR notes, unsubscribe blacklist, and contact policies documented in `COMPLIANCE.md` and `privacy.md`.
 
-### 2. Installazione
+## Stack
+
+Python 3.11 · LangGraph / LangChain · LangSmith (tracing) · Anthropic API · PostgreSQL + pgvector · SQLModel + Alembic · FastAPI · Playwright (research) · Streamlit (approval dashboard) · Resend (email) · pre-commit
+
+## Getting started
 
 ```bash
-git clone https://github.com/tuousername/ai-outreach-agent
+git clone https://github.com/hajebzehir03-ai/ai-outreach-agent.git
 cd ai-outreach-agent
-uv sync --extra dev
-cp .env.example .env
-# Compila le API key in .env
+cp .env.example .env    # Anthropic, Google Places, Resend, Postgres credentials
+pip install -e .
+python -m adh.cli --help
 ```
 
-### 3. Database
-
-```bash
-# Avvia PostgreSQL locale (o usa un cloud provider)
-uv run python -c "from adh.models.database import create_db_and_tables; create_db_and_tables()"
-```
-
-### 4. Dashboard
-
-```bash
-uv run streamlit run adh/dashboard/app.py
-```
-
-### 5. Webhook (reply handling)
-
-```bash
-uv run uvicorn adh.api.webhook:app --port 8000
-# Configura il webhook URL in Resend: https://tuohost/webhook/resend
-```
-
-### 6. Scout manuale (test su un settore)
-
-```bash
-uv run adh run-scout --sector "Studi commercialisti" --region "Piemonte" --limit 20
-```
-
----
-
-## Struttura progetto
-
-```
-adh/
-├── agents/
-│   ├── state.py           # AgentState condiviso tra tutti i nodi
-│   ├── orchestrator.py    # LangGraph state machine
-│   ├── scout.py           # Sourcing Google Places
-│   ├── researcher.py      # Enrichment web + LLM
-│   ├── qualifier.py       # Score 0-100 + angolo pitch
-│   ├── writer.py          # Email personalizzata + self_check
-│   ├── sender.py          # Invio via Resend
-│   └── reply_handler.py   # Classificazione 9 categorie
-├── api/
-│   └── webhook.py         # FastAPI endpoint Resend
-├── config/
-│   ├── settings.py        # Pydantic settings da .env
-│   └── icp.yaml           # ICP configurabile
-├── dashboard/
-│   └── app.py             # Streamlit: approval queue, CRM, funnel
-├── models/
-│   ├── company.py         # SQLModel: Company
-│   ├── intel.py           # SQLModel: CompanyIntel
-│   ├── message.py         # SQLModel: OutreachMessage, ProcessingLog
-│   └── database.py        # Engine + session
-└── prompts/
-    ├── scout.md
-    ├── researcher.md
-    ├── qualifier.md
-    ├── writer.md           # ⭐ Contiene few-shot examples in italiano
-    ├── reply_handler.md
-    └── orchestrator.md
-docs/
-├── research/              # 10 schede competitor + summary
-└── decisions/             # ADR (Architecture Decision Records)
-tests/
-└── agents/                # test_writer, test_qualifier, test_reply_handler
-```
-
----
-
-## Regole operative
-
-| Regola | Valore |
-|---|---|
-| Max email/giorno | 30 (configurable) |
-| Finestra invio | 9:00–18:00 lun–gio |
-| Warm-up settimane 1-2 | 5-10 email/giorno |
-| Follow-up | 2 max (dopo 4 e 10 giorni) |
-| Blacklist permanente | Chi invia STOP |
-| Score minimo | 60/100 |
-| Evidence bullets minimi | 3 (altrimenti drop) |
-
----
-
-## Kill switch
-
-```bash
-adh stop-all --reason "Cambio dominio outreach"
-```
-
-Blocca immediatamente tutti gli invii pianificati. Per riattivare: `KILL_SWITCH=false` in `.env` + restart.
-
----
-
-## GDPR
-
-Leggi [COMPLIANCE.md](COMPLIANCE.md) prima di avviare qualsiasi campagna.  
-Pubblica [privacy.md](privacy.md) come pagina sul tuo sito e linka nella firma email.
-
-**Non inviare mai a:**
-- Email personali (Gmail, Libero, Yahoo)
-- Aziende con `do_not_contact=true` nel profilo
-- Aziende in blacklist
-
----
+The approval dashboard runs with Streamlit; architecture notes and decision records live in `docs/`.
 
 ## Testing
 
 ```bash
-uv run pytest -v
+pytest
 ```
 
-Coverage minima: 70%. I test sono progettati con LLM mockato — non richiedono API key reali.
+The suite covers agents and tools (mocked LLM calls, state transitions, reply classification). Built through two audit-and-hardening rounds that grew coverage from 37% to 73%.
 
----
+## License
 
-## Roadmap
-
-- **v0.1** — Pipeline completa email con approval gate ✅
-- **v0.2** — Seconda fonte di sourcing (Pagine Gialle scraping)
-- **v0.3** — LinkedIn follow-up via Computer Use
-- **v0.4** — PostgreSQL checkpointer per LangGraph (invece di MemorySaver)
-- **v0.5** — A/B test prompt Writer con versionamento `writer_v2.md`
+MIT
