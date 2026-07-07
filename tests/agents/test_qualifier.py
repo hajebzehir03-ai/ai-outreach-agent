@@ -1,11 +1,18 @@
 """Test Qualifier Agent: parsing JSON, do_not_contact, evidence enforcement."""
 
 import json
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+from anthropic.types import TextBlock
+
 from adh.agents.state import (
-    AgentState, CompanyData, IntelData, PainSignal,
-    Buyability, TechStack, DecisionMaker,
+    AgentState,
+    Buyability,
+    CompanyData,
+    DecisionMaker,
+    IntelData,
+    PainSignal,
+    TechStack,
 )
 
 
@@ -27,7 +34,7 @@ def _make_qualifier_response(**overrides) -> MagicMock:
     }
     payload.update(overrides)
     mock = MagicMock()
-    mock.content = [MagicMock(text=json.dumps(payload))]
+    mock.content = [TextBlock(type="text", text=json.dumps(payload))]
     return mock
 
 

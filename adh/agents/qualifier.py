@@ -2,10 +2,15 @@
 
 import json
 import re
+
 from anthropic import Anthropic
 
+from adh.agents._utils import extract_text
 from adh.agents.state import (
-    AgentState, QualificationData, ScoreBreakdown, load_prompt,
+    AgentState,
+    QualificationData,
+    ScoreBreakdown,
+    load_prompt,
 )
 from adh.config.settings import settings
 
@@ -71,7 +76,7 @@ Produce the full JSON output as specified."""
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_msg}],
         )
-        raw = response.content[0].text.strip()
+        raw = extract_text(response)
         raw = re.sub(r"^```json\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
         data = json.loads(raw)

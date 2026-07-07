@@ -1,8 +1,10 @@
 """Scout Agent — trova PMI italiane via Google Places API."""
 
-import json
+from typing import Any, cast
+
 import httpx
-from adh.agents.state import AgentState, CompanyData, load_prompt
+
+from adh.agents.state import AgentState, CompanyData
 from adh.config.settings import settings
 
 PLACES_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
@@ -21,7 +23,7 @@ def _in_region(address: str, region: str) -> bool:
     return any(kw.lower() in address.lower() for kw in keywords)
 
 
-async def _place_details(place_id: str) -> dict:
+async def _place_details(place_id: str) -> dict[str, Any]:
     params = {
         "place_id": place_id,
         "fields": "name,formatted_address,website,formatted_phone_number,business_status",
@@ -31,7 +33,7 @@ async def _place_details(place_id: str) -> dict:
     async with httpx.AsyncClient(timeout=10.0) as c:
         r = await c.get(PLACES_DETAILS_URL, params=params)
         r.raise_for_status()
-    return r.json().get("result", {})
+    return cast(dict[str, Any], r.json().get("result", {}))
 
 
 async def scout_single_sector(sector_name: str, region: str, limit: int = 50) -> list[CompanyData]:

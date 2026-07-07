@@ -1,6 +1,6 @@
-from typing import Optional
-from pydantic import BaseModel
 from pathlib import Path
+
+from pydantic import BaseModel
 
 
 def load_prompt(name: str) -> str:
@@ -13,20 +13,23 @@ def load_prompt(name: str) -> str:
 
 class CompanyData(BaseModel):
     name: str
-    piva: Optional[str] = None
-    website: Optional[str] = None
+    piva: str | None = None
+    website: str | None = None
     sector: str
-    subsector: Optional[str] = None
+    subsector: str | None = None
     city: str
     region: str
     employees_estimate: str = "unknown"  # "5-10 | 10-25 | 25-50 | 50-100 | unknown"
     sources: list[str] = []
     confidence: float = 1.0
-    notes: Optional[str] = None
+    notes: str | None = None
     # enriched during pipeline
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    google_place_id: Optional[str] = None
+    phone: str | None = None
+    email: str | None = None
+    google_place_id: str | None = None
+    decision_maker_name: str | None = None
+    decision_maker_role: str | None = None
+    decision_maker_email: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +46,8 @@ class PainSignal(BaseModel):
 class DecisionMaker(BaseModel):
     name: str
     role: str
-    linkedin: Optional[str] = None
-    email_guessed: Optional[str] = None
+    linkedin: str | None = None
+    email_guessed: str | None = None
     email_pattern_confidence: float = 0.0
     source: str
 
@@ -56,9 +59,9 @@ class Buyability(BaseModel):
 
 
 class TechStack(BaseModel):
-    cms: Optional[str] = None
-    chatbot: Optional[str] = None
-    crm: Optional[str] = None
+    cms: str | None = None
+    chatbot: str | None = None
+    crm: str | None = None
     other: list[str] = []
 
 
@@ -123,6 +126,7 @@ class MessageData(BaseModel):
     self_check: SelfCheck = SelfCheck()
     pitch_angle: str = ""
     sequence_step: int = 1
+    db_message_id: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -130,11 +134,11 @@ class MessageData(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ReplyExtracted(BaseModel):
-    redirected_to: Optional[str] = None
-    follow_up_date: Optional[str] = None      # ISO8601
-    question: Optional[str] = None
-    objection: Optional[str] = None
-    meeting_proposal: Optional[str] = None
+    redirected_to: str | None = None
+    follow_up_date: str | None = None      # ISO8601
+    question: str | None = None
+    objection: str | None = None
+    meeting_proposal: str | None = None
 
 
 class ReplyData(BaseModel):
@@ -142,7 +146,7 @@ class ReplyData(BaseModel):
     confidence: float = 0.0
     extracted: ReplyExtracted = ReplyExtracted()
     recommended_action: str = ""
-    draft_response: Optional[str] = None
+    draft_response: str | None = None
     urgency: str = "low"  # "high | medium | low"
 
 
@@ -152,27 +156,30 @@ class ReplyData(BaseModel):
 
 class AgentState(BaseModel):
     # Identificatori
-    company_id: Optional[int] = None
-    run_id: Optional[str] = None
+    company_id: int | None = None
+    run_id: str | None = None
     sequence_step: int = 1
 
     # Dati pipeline
-    company: Optional[CompanyData] = None
-    intel: Optional[IntelData] = None
-    qualification: Optional[QualificationData] = None
-    message: Optional[MessageData] = None
-    reply: Optional[ReplyData] = None
+    company: CompanyData | None = None
+    intel: IntelData | None = None
+    qualification: QualificationData | None = None
+    message: MessageData | None = None
+    reply: ReplyData | None = None
 
     # Flow control
     current_step: str = "scout"
     status: str = "running"
-    error: Optional[str] = None
+    error: str | None = None
 
     # Approval gate
-    approval_status: Optional[str] = None   # "approved" | "rejected" | "edited"
-    rejection_feedback: Optional[str] = None
-    edited_subject: Optional[str] = None
-    edited_body: Optional[str] = None
+    approval_status: str | None = None   # "approved" | "rejected" | "edited"
+    rejection_feedback: str | None = None
+    edited_subject: str | None = None
+    edited_body: str | None = None
 
     # Writer retry counter
     writer_attempts: int = 0
+
+    # Sending tracking
+    resend_id: str | None = None

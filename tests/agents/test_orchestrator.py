@@ -1,0 +1,287 @@
+"""Test Orchestrator: router functions, build_graph, create_pipeline."""
+
+from unittest.mock import patch
+
+from adh.agents.orchestrator import (
+    _after_approval,
+    _after_qualifier,
+    _after_writer,
+    approval_gate_node,
+    archive_node,
+    build_graph,
+    create_pipeline,
+    requeue_writer_node,
+)
+from adh.agents.state import (
+    AgentState,
+    CompanyData,
+    QualificationData,
+    ScoreBreakdown,
+)
+
+
+def _make_state(
+    *,
+    status="running",
+    current_step="qualifier",
+    approval_status=None,
+    qualification=None,
+    writer_attempts=0,
+):
+    company = CompanyData(
+        name="Studio Bertoli",
+        sector="Studi commercialisti",
+        region="Piemonte",
+        city="Torino",
+    )
+    if qualification is None:
+        qualification = QualificationData(
+            score=85,
+            score_breakdown=ScoreBreakdown(
+                fit_icp=35, pain_signals=25, buyability=15, reachability=10
+            ),
+            tier="priority",
+            selected_angle="email_triage",
+            angle_rationale="Segnali evidenti.",
+            evidence_for_writer=["Evidence 1", "Evidence 2", "Evidence 3"],
+            risk_flags=[],
+            do_not_contact=False,
+            should_proceed=True,
+        )
+    return AgentState(
+        company=company,
+        qualification=qualification,
+        status=status,
+        current_step=current_step,
+        approval_status=approval_status,
+        writer_attempts=writer_attempts,
+    )
+
+
+def _make_qualification(*, should_proceed=True, do_not_contact=False, score=85):
+    return QualificationData(
+        score=score,
+        score_breakdown=ScoreBreakdown(
+            fit_icp=35, pain_signals=25, buyability=15, reachability=10
+        ),
+        tier="priority" if score >= 80 else "secondary",
+        selected_angle="email_triage",
+        angle_rationale="Test.",
+        evidence_for_writer=["E1", "E2", "E3"],
+        risk_flags=[],
+        do_not_contact=do_not_contact,
+        should_proceed=should_proceed,
+    )
+
+
+class TestAfterQualifier:
+    def test_high_score_proceeds_to_writer(self):
+        state = _make_state(qualification=_make_qualification(should_proceed=True, score=85))
+        assert _after_qualifier(state) == "writer"
+
+    def test_low_score_goes_to_archive(self):
+        state = _make_state(qualification=_make_qualification(should_proceed=False, score=45))
+        assert _after_qualifier(state) == "archive"
+
+    def test_do_not_contact_goes_to_archive(self):
+        state = _make_state(
+            qualification=_make_qualification(do_not_contact=True, should_proceed=False)
+        )
+        assert _after_qualifier(state) == "archive"
+
+    def test_no_qualification_goes_to_archive(self):
+        state = AgentState(
+            company=CompanyData(name="Test", sector="test", region="test", city="test"),
+            qualification=None,
+        )
+        assert _after_qualifier(state) == "archive"
+
+
+class TestAfterWriter:
+    def test_error_status_goes_to_archive(self):
+        state = _make_state(status="error", current_step="writer")
+        assert _after_writer(state) == "archive"
+
+    def test_current_step_writer_retries(self):
+        state = _make_state(status="running", current_step="writer")
+        assert _after_writer(state) == "writer"
+
+    def test_approval_gate_step_goes_to_approval(self):
+        state = _make_state(status="running", current_step="approval_gate")
+        assert _after_writer(state) == "approval_gate"
+
+    def test_sent_status_goes_to_approval(self):
+        state = _make_state(status="running", current_step="sent")
+        assert _after_writer(state) == "approval_gate"
+
+
+class TestAfterApproval:
+    def test_approved_goes_to_sender(self):
+        state = _make_state(approval_status="approved")
+        assert _after_approval(state) == "sender"
+
+    def test_edited_goes_to_sender(self):
+        state = _make_state(approval_status="edited")
+        assert _after_approval(state) == "sender"
+
+    def test_rejected_goes_to_archive(self):
+        state = _make_state(approval_status="rejected")
+        assert _after_approval(state) == "archive"
+
+    def test_none_goes_to_wait(self):
+        state = _make_state(approval_status=None)
+        assert _after_approval(state) == "wait"
+
+    def test_unknown_status_goes_to_wait(self):
+        state = _make_state(approval_status="unknown_value")
+        assert _after_approval(state) == "wait"
+
+
+class TestUtilityNodes:
+    def test_archive_node_sets_status(self):
+        state = _make_state(status="running")
+        result = archive_node(state)
+        assert result.status == "archived"
+        assert result.current_step == "archived"
+
+    def test_archive_node_preserves_company(self):
+        state = _make_state()
+        result = archive_node(state)
+        assert result.company is not None
+        assert result.company.name == "Studio Bertoli"
+
+    def test_approval_gate_node_sets_step(self):
+        state = _make_state(current_step="writer")
+        result = approval_gate_node(state)
+        assert result.current_step == "approval_gate"
+
+    def test_requeue_writer_node_sets_step(self):
+        state = _make_state(current_step="approval_gate")
+        result = requeue_writer_node(state)
+        assert result.current_step == "writer"
+
+
+class TestBuildGraph:
+    def test_build_graph_returns_state_graph(self):
+        from langgraph.graph import StateGraph
+        graph = build_graph()
+        assert isinstance(graph, StateGraph)
+
+    def test_graph_has_all_nodes(self):
+        graph = build_graph()
+        node_names = set(graph.nodes.keys())
+        expected = {"scout", "researcher", "qualifier", "writer",
+                    "approval_gate", "sender", "archive"}
+        assert expected.issubset(node_names)
+
+    def test_create_pipeline_compiles_successfully(self):
+        pipeline = create_pipeline()
+        assert pipeline is not None
+
+    def test_create_pipeline_with_memory_saver(self):
+        pipeline = create_pipeline()
+        assert callable(pipeline.invoke)
+
+    def test_create_pipeline_accepts_custom_checkpointer(self):
+        from langgraph.checkpoint.memory import MemorySaver
+        custom = MemorySaver()
+        pipeline = create_pipeline(checkpointer=custom)
+        assert pipeline is not None
+
+
+class TestEndToEnd:
+    def test_low_score_pipeline_archives(self):
+        from langgraph.checkpoint.memory import MemorySaver
+        low_score_qualification = _make_qualification(should_proceed=False, score=40)
+
+        def mock_scout(state):
+            return state.model_copy(update={"current_step": "researcher"})
+
+        def mock_researcher(state):
+            return state.model_copy(update={"current_step": "qualifier"})
+
+        def mock_qualifier(state):
+            return state.model_copy(update={
+                "qualification": low_score_qualification,
+                "current_step": "qualifier",
+            })
+
+        with patch("adh.agents.orchestrator.scout_node", mock_scout), \
+             patch("adh.agents.orchestrator.researcher_node", mock_researcher), \
+             patch("adh.agents.orchestrator.qualifier_node", mock_qualifier):
+            pipeline = create_pipeline(checkpointer=MemorySaver())
+            initial_state = AgentState(
+                company=CompanyData(
+                    name="Studio Test", sector="test", region="Piemonte", city="Torino",
+                ),
+                company_id=1,
+            )
+            config = {"configurable": {"thread_id": "test-low-score"}}
+            result = pipeline.invoke(initial_state, config=config)
+
+        assert result["status"] == "archived"
+
+    def test_pipeline_interrupts_before_sender(self):
+        from langgraph.checkpoint.memory import MemorySaver
+        good_qualification = _make_qualification(should_proceed=True, score=85)
+
+        def mock_scout(state):
+            return state.model_copy(update={"current_step": "researcher"})
+
+        def mock_researcher(state):
+            return state.model_copy(update={"current_step": "qualifier"})
+
+        def mock_qualifier(state):
+            return state.model_copy(update={
+                "qualification": good_qualification,
+                "current_step": "approval_gate",
+            })
+
+        def mock_writer(state):
+            from adh.agents.state import MessageData, SelfCheck
+            message = MessageData(
+                subject="Test subject",
+                body="Test body con contenuto realistico.",
+                word_count=10,
+                self_check=SelfCheck(
+                    specific_hook_present=True,
+                    banned_words_used=[],
+                    cta_concrete=True,
+                    ps_used=False,
+                    estimated_personalization_score=8,
+                ),
+                pitch_angle="email_triage",
+                sequence_step=1,
+                db_message_id=None,
+            )
+            return state.model_copy(update={
+                "message": message,
+                "current_step": "approval_gate",
+                "approval_status": None,
+            })
+
+        sender_called = []
+
+        def mock_sender(state):
+            sender_called.append(True)
+            return state.model_copy(update={"status": "sent"})
+
+        checkpointer = MemorySaver()
+        config = {"configurable": {"thread_id": "test-interrupt"}}
+
+        with patch("adh.agents.orchestrator.scout_node", mock_scout), \
+             patch("adh.agents.orchestrator.researcher_node", mock_researcher), \
+             patch("adh.agents.orchestrator.qualifier_node", mock_qualifier), \
+             patch("adh.agents.orchestrator.writer_node", mock_writer), \
+             patch("adh.agents.orchestrator.sender_node", mock_sender):
+            pipeline = create_pipeline(checkpointer=checkpointer)
+            initial_state = AgentState(
+                company=CompanyData(
+                    name="Studio Test", sector="test", region="Piemonte", city="Torino",
+                ),
+                company_id=1,
+            )
+            result = pipeline.invoke(initial_state, config=config)
+
+        assert len(sender_called) == 0
+        assert result.get("message") is not None or result.get("current_step") == "approval_gate"

@@ -1,14 +1,15 @@
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
-from enum import Enum
-from sqlmodel import SQLModel, Field, Column, Relationship
-from sqlalchemy import Text, JSON
+from enum import StrEnum
+from typing import TYPE_CHECKING, Optional
+
+from sqlalchemy import JSON, Text
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from adh.models.company import Company
 
 
-class MessageStatus(str, Enum):
+class MessageStatus(StrEnum):
     draft = "draft"
     pending_approval = "pending_approval"
     approved = "approved"
@@ -20,19 +21,22 @@ class MessageStatus(str, Enum):
     failed = "failed"
 
 
-class ReplyIntent(str, Enum):
+class ReplyIntent(StrEnum):
     interested = "interested"
+    interested_later = "interested_later"
     not_now = "not_now"
     not_interested = "not_interested"
     unsubscribe = "unsubscribe"
     out_of_office = "out_of_office"
     question = "question"
+    wrong_person = "wrong_person"
+    other = "other"
 
 
 class OutreachMessage(SQLModel, table=True):
     __tablename__ = "outreach_messages"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     company_id: int = Field(foreign_key="companies.id", index=True)
 
     # Email content
@@ -44,26 +48,26 @@ class OutreachMessage(SQLModel, table=True):
 
     # Status tracking
     status: MessageStatus = Field(default=MessageStatus.draft, index=True)
-    resend_message_id: Optional[str] = None
+    resend_message_id: str | None = None
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    approved_at: Optional[datetime] = None
-    sent_at: Optional[datetime] = None
-    opened_at: Optional[datetime] = None
-    clicked_at: Optional[datetime] = None
+    approved_at: datetime | None = None
+    sent_at: datetime | None = None
+    opened_at: datetime | None = None
+    clicked_at: datetime | None = None
 
     # Approval flow
-    rejection_feedback: Optional[str] = Field(default=None, sa_column=Column(Text))
+    rejection_feedback: str | None = Field(default=None, sa_column=Column(Text))
 
     # Reply handling
-    reply_received_at: Optional[datetime] = None
-    reply_intent: Optional[ReplyIntent] = None
-    reply_body: Optional[str] = Field(default=None, sa_column=Column(Text))
-    reply_draft: Optional[str] = Field(default=None, sa_column=Column(Text))
+    reply_received_at: datetime | None = None
+    reply_intent: ReplyIntent | None = None
+    reply_body: str | None = Field(default=None, sa_column=Column(Text))
+    reply_draft: str | None = Field(default=None, sa_column=Column(Text))
 
     # Metadata
-    writer_model: Optional[str] = None
+    writer_model: str | None = None
     generation_context: dict = Field(default={}, sa_column=Column(JSON))
 
     company: Optional["Company"] = Relationship(back_populates="messages")
@@ -74,12 +78,12 @@ class ProcessingLog(SQLModel, table=True):
 
     __tablename__ = "processing_log"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    company_id: Optional[int] = Field(default=None, foreign_key="companies.id")
-    message_id: Optional[int] = Field(default=None, foreign_key="outreach_messages.id")
+    id: int | None = Field(default=None, primary_key=True)
+    company_id: int | None = Field(default=None, foreign_key="companies.id")
+    message_id: int | None = Field(default=None, foreign_key="outreach_messages.id")
     action: str
     legal_basis: str = Field(default="legittimo_interesse_gdpr_6_1_f")
     data_processed: list = Field(default=[], sa_column=Column(JSON))
     performed_at: datetime = Field(default_factory=datetime.utcnow)
-    retention_until: Optional[datetime] = None
-    notes: Optional[str] = None
+    retention_until: datetime | None = None
+    notes: str | None = None
